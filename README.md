@@ -2,8 +2,8 @@
 
 ## Algorithm
 
-This program use Monte Carlo tree search (MCTS) for the computer player.
-The player only use the algorithm and does not use other strategies such as evaluation functions for evaluating a board.
+This program uses Monte Carlo tree search (MCTS) for the computer player.
+The player only uses the algorithm and does not use other strategies such as evaluation functions for evaluating a board.
 
 ## Usage
 

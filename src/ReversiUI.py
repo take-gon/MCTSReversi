@@ -15,7 +15,7 @@ class ReversiBoard(Tk.Canvas):
 	objids = []
 
 	def __init__(self, master):
-		cwidth = 8 * self.cell_size
+		cwidth = rvs.BOARD_SIZE * self.cell_size
 
 		Tk.Canvas.__init__(self, master, relief=Tk.RAISED, bd=4, bg='white', width=cwidth, height=cwidth)
 

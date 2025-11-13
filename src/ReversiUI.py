@@ -1,5 +1,5 @@
 import sys
-import mcts_reversi as rvs
+import osero as rvs
 
 import tkinter as Tk
 
@@ -91,12 +91,20 @@ class ReversiBoard(Tk.Canvas):
 		player_stone = rvs.countStones(self.board, rvs.PLAYER_NUM)
 		mcts_stone   = rvs.countStones(self.board, rvs.MCTS_NUM)
 		
+
+		list_msg1 = ["You won","Draw","You lose",]
+		list_msg2 = ["player_stone","mcts_stone"]
 		if player_stone > mcts_stone:
-			msg = "You won"
+			print (list_msg1[0])
+			msg = "player_stone",player_stone,"mcts_stone",mcts_stone
 		elif player_stone == mcts_stone:
-			msg = "Draw"
+			print (list_msg1[1])
+			msg = "player_stone",player_stone
+			msg = "mcts_stone",mcts_stone
 		else:
-			msg = "You lose"
+			print (list_msg1[2])
+			msg = "player_stone",player_stone
+			msg = "mcts_stone",mcts_stone
 		
 		idnum = self.create_text('2c', '1.5c', text=msg, font=('Helvetica', '20', 'bold'), fill="#FF0000")
 		self.objids.append( idnum )

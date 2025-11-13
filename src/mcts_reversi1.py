@@ -1,10 +1,9 @@
-
 import random
 import math
 import time
-import copy
-import concurrent.futures  # ← 忘れずにインポート
 import threading
+import copy
+import time
 
 
 
@@ -13,7 +12,7 @@ BOARD_SIZE = 8
 PLAYER_NUM = 2
 MCTS_NUM   = 1
 
-MAX_THINK_TIME = 5
+MAX_THINK_TIME = 20
 
 
 #------------------------------------
@@ -90,14 +89,15 @@ def countStones(board, turn):
 # Return a list of all positions in which the specified player can place a stone.
 #------------------------------------
 def checkPlacablePositions(board, turn):
-
+	#placable_positions 全ての置ける位置
 	placable_positions = []
 
 	for i in range(0, BOARD_SIZE):
 		for j in range(0, BOARD_SIZE):
 			if board[i][j] != 0:
 				continue
-			if updateBoard(board, turn, i, j, checkonly=True) > 0:
+			if updateBoard(board, turn, i, j, checkonly=True) > 0:#revesed_stoneの値を入手したときにcheclonlyはfalseになる
+				#updateBoard(現在のボード, turn, i, j, checkonly=True　チェックするだけ
 				placable_positions.append( (i,j) )
 	return placable_positions
 
@@ -223,6 +223,7 @@ def updateBoard(board, turn, i, j, checkonly=False):
 			if not(checkonly):
 				board[i+m3][j-m3] = turn
 			reversed_stone += 1
+			
 	#-------------------------------------------------
 
 	return reversed_stone
@@ -233,9 +234,10 @@ def updateBoard(board, turn, i, j, checkonly=False):
 # Get a hand-input position
 #------------------------------------
 def handinputNextPosition(board, turn):
+	print("head in")#読み込まれているかの確認
 
 	while True:
-		print("Possible positions are ", checkPlacablePositions(board, turn))
+		print("Possible positions are ", checkPlacablePositions(board, turn))#配置可能な位置の確認
 		print("")
 
 		while True:
@@ -252,7 +254,7 @@ def handinputNextPosition(board, turn):
 
 		print("Your input : (", i, ",", j,")")
 
-		if board[i][j] == 0 and updateBoard(board, turn, i, j, checkonly=True) > 0:
+		if board[i][j] == 0 and updateBoard(board, turn, i, j, checkonly=True) > 0:#空白の状態かつupdateboarddの
 			break
 		print("not correct position!!")
 
@@ -263,7 +265,10 @@ def handinputNextPosition(board, turn):
 #------------------------------------
 # Decide the next position utilizing MCTS
 #------------------------------------
+
+
 def mctsNextPosition(board):
+	print("試行中...")
 
 	def calc_ucb1( node_tuple, t, cval ):
 		name, nplayout, reward, childrens = node_tuple
@@ -393,14 +398,10 @@ def mctsNextPosition(board):
 	#-----------------------------------------------------
 	root = expand_node(board, MCTS_NUM)
 	current_board = getInitialBoard()
-
-	# スレッド数
-	NUM_THREADS = 4
-	local_board = []
-	for i in range(NUM_THREADS):
-		local_board.append( getInitialBoard() )
+	current_board2 = getInitialBoard()
 
 	start_time = time.time()
+	
 
 	for loop in range(0, 5000):
 
@@ -431,19 +432,47 @@ def mctsNextPosition(board):
 		#--------------------------------------
 		# Playout
 
-		def threaded_playout(index, turn):
-			# the board needs to be copied because the board data is modified in find_playout
-			copyBoard(local_board[index], current_board)
-			return find_playout(local_board[index], turn)
+		# the board needs to be copied because the board data is modified in find_playout
 
-		# スレッドプールで複数のプレイアウトを同時に実行
-		with concurrent.futures.ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
-			futures = [executor.submit(threaded_playout, index, turn) for index in range(NUM_THREADS)]
-			# 複数の結果から多数決（True の数が多ければ勝ちと判定）
-			isWon = [f.result() for f in futures].count(True) > (NUM_THREADS // 2)
+		#copyBoard(current_board2, current_board,)
+		#isWon = find_playout( current_board2, turn)
+
+
+		# スレッド数
+		NUM_THREADS = 4
+
+		# 結果を保存するリスト
+		thread_results = [None] * NUM_THREADS
+		threads = []
+
+		
+		def threaded_playout(index, board_snapshot, turn):
+			local_board = copy.deepcopy(board_snapshot)
+			result = find_playout(local_board, turn)
+			thread_results[index] = result
+
+# 現在の盤面を保存
+		board_snapshot = copy.deepcopy(current_board)
+
+# スレッドの作成と開始
+		for i in range(NUM_THREADS):#4回繰り返す
+			t = threading.Thread(target=threaded_playout, args=(i, board_snapshot, turn), name=f"PlayoutThread-{i}")
+			t.start()
+			threads.append(t)
+
+# 全スレッドの終了待ち
+		for t in threads:
+			t.join()
+
+# 1番目の結果を使う（or any logic, like majority vote）
+		isWon = thread_results[0]
+				
+
+		#--------------------------------------
 
 		if loop%500 == 0 and loop > 0:
 			print("loop:", loop, current_path, len(current_path), " eval val: ", isWon)
+		
 
 		#--------------------------------------
 		# Up date of the tree (from the root of the tree to leafs)
@@ -472,6 +501,9 @@ def mctsNextPosition(board):
 
 			current_childrens = t_childrens
 		#--------------------------------------
+	end = time.time()  # 現在時刻（処理完了後）を取得
+	time_diff = end - start_time  # 処理完了後の時刻から処理開始前の時刻を減算する
+	print(time_diff)
 	#-----------------------------------------------------
 
 	print("loop count: ", loop)
@@ -487,29 +519,30 @@ def mctsNextPosition(board):
 			max_avg_reward = t_reward / t_nplayout
 	
 	return result_ij_pair
+	
 
 #---------------------------------------------------------------------------------------------
 if __name__ == "__main__" :
 
 	random.seed(200)
 
-	current_board = getInitialBoard()
+	current_board = getInitialBoard()#ボードの初期化
 
 	printBoard( current_board )
 	
-	isPlayerTurn = True
+	isPlayerTurn = True #どっちの手番か trueならplayerから
 
 	while True:
-		player_possibility = len(checkPlacablePositions(current_board, PLAYER_NUM))
-		mcts_possibility   = len(checkPlacablePositions(current_board, MCTS_NUM))
+		player_possibility = len(checkPlacablePositions(current_board, PLAYER_NUM))#貴方の置ける位置
+		mcts_possibility   = len(checkPlacablePositions(current_board, MCTS_NUM))#敵の置ける位置
 
 		#print(player_possibility)
 		#print(mcts_possibility)
 
-		if player_possibility == 0 and mcts_possibility == 0:
+		if player_possibility == 0 and mcts_possibility == 0:#もうこれ以上置けない
 			break
-		if (isPlayerTurn and player_possibility == 0) or (not(isPlayerTurn) and mcts_possibility == 0):
-			isPlayerTurn = not(isPlayerTurn)
+		if (isPlayerTurn and player_possibility == 0) or (not(isPlayerTurn) and mcts_possibility == 0):#パスのコード
+			isPlayerTurn = not(isPlayerTurn)#パスするしかないため相手にターンを渡す
 			continue
 
 		if isPlayerTurn:
@@ -532,21 +565,14 @@ if __name__ == "__main__" :
 	
 	player_stone = countStones(current_board, PLAYER_NUM)
 	mcts_stone   = countStones(current_board, MCTS_NUM)
-
 	print("RESULT:")
 	print("  Your stones   : ", player_stone)
 	print("  MCTS's stones : ", mcts_stone)
-
 	if player_stone > mcts_stone :
 		print("You won")
 	elif player_stone == mcts_stone :
 		print("Draw")
 	else:
 		print("You lose")
-
 	printBoard( current_board )
-
-
-
-
 
